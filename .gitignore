@@ -26,6 +26,20 @@ desktop.ini
 
 # IndexTTS.
 /cache/
-/checkpoints/*
-!/checkpoints/*.yaml
 /outputs/
+
+# 模型文件 - 排除大文件但保留配置文件
+checkpoints/*.pth
+checkpoints/*.safetensors
+checkpoints/*.bin
+checkpoints/qwen0.6bemo4-merge/
+checkpoints/.msc
+checkpoints/.mv
+checkpoints/._____temp/
+
+# 保留配置文件
+!checkpoints/*.yaml
+!checkpoints/*.json
+!checkpoints/*.model
+!checkpoints/*.pt
+!checkpoints/README.md
