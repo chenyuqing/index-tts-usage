@@ -1,0 +1,48 @@
+# Development Tools.
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+.idea/
+.vscode/
+
+# Environments.
+.venv*/
+venv*/
+conda_env*/
+
+# Python Bytecode.
+*.py[cod]
+
+# Distribution/Packaging.
+/build/
+/dist/
+*.egg-info/
+.pypirc
+
+# Operating System Junk.
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# IndexTTS.
+/cache/
+/checkpoints/*
+!/checkpoints/*.yaml
+!/checkpoints/*.json
+!/checkpoints/README.md
+!/checkpoints/bpe.model
+/outputs/
+
+# GPT-SoVITS large files
+cantonese-integration/gpt_sovits_package/GPT-SoVITS/tools/uvr5/uvr5_weights/
+cantonese-integration/gpt_sovits_package/GPT-SoVITS/tools/AP_BWE_main/
+cantonese-integration/gpt_sovits_package/GPT-SoVITS.zip
+
+# Temporary and log files
+*.log
+logs/
+temp/
+tmp/
+
+# API service virtual environment
+indextts2-api/.venv/

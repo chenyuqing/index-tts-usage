@@ -1,0 +1,1 @@
+"""Configuration module for IndexTTS2 API service"""
