@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>全局设置 - 自动配音</title>
+    <style>
+      body {
+        font-family: "SF Pro Display", "PingFang SC", Helvetica, Arial, sans-serif;
+        background: #f5f7fb;
+        margin: 0;
+        padding: 2.5rem;
+        color: #1f2933;
+      }
+
+      h1 {
+        margin-bottom: 1.5rem;
+        font-size: 1.8rem;
+      }
+
+      .card {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 12px 32px rgba(63, 81, 181, 0.08);
+        border: 1px solid #d9deeb;
+        padding: 1.6rem;
+        max-width: 900px;
+        margin-bottom: 1.5rem;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+      }
+
+      input[type="text"],
+      input[type="number"] {
+        margin-top: 0.35rem;
+        border-radius: 8px;
+        border: 1px solid #d9deeb;
+        padding: 0.5rem 0.65rem;
+        font-size: 0.95rem;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: #3f51b5;
+        box-shadow: 0 0 0 2px #e8eaf6;
+      }
+
+      .checkbox-group {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      .checkbox-group label {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0;
+      }
+
+      .speaker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+
+      .speaker-card {
+        border: 1px solid #d9deeb;
+        border-radius: 12px;
+        padding: 1rem;
+        background: #f9faff;
+      }
+
+      .speaker-card h3 {
+        margin: 0 0 0.8rem;
+        font-size: 1rem;
+      }
+
+      .actions {
+        margin-top: 1.2rem;
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      button {
+        padding: 0.55rem 1.4rem;
+        border-radius: 999px;
+        border: none;
+        background: #3f51b5;
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #fff;
+        color: #3f51b5;
+        border: 1px solid #3f51b5;
+      }
+
+      a.back-link {
+        display: inline-block;
+        margin-bottom: 1rem;
+        color: #3f51b5;
+        text-decoration: none;
+      }
+
+      .flash {
+        padding: 0.9rem 1.1rem;
+        border-radius: 10px;
+        margin-bottom: 1.2rem;
+      }
+
+      .flash.error { background: #ffebee; color: #c62828; }
+      .flash.warning { background: #fff8e1; color: #ef6c00; }
+    </style>
+  </head>
+  <body>
+    <a href="{{ url_for('index', **settings_query) }}" class="back-link">← 返回控制台</a>
+    <h1>全局设置</h1>
+
+    <form method="post">
+      <div class="card">
+        <h2>基础路径</h2>
+        <label>基础目录
+          <input type="text" name="base_dir" value="{{ settings.base_dir }}" required />
+        </label>
+        <label>模型目录
+          <input type="text" name="model_dir" value="{{ settings.model_dir }}" />
+        </label>
+        <label>音色目录
+          <input type="text" name="voice_root" value="{{ settings.voice_root }}" placeholder="默认 base_dir/voice-reference" />
+        </label>
+        <label>配置文件
+          <input type="text" name="config_path" value="{{ settings.config_path }}" placeholder="默认 base_dir/speakers.yaml" />
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>推理参数</h2>
+        <label>默认设备
+          <input type="text" name="device" value="{{ settings.device }}" placeholder="如 cuda:0 / cpu / mps" />
+        </label>
+        <label>默认 Max Text Tokens
+          <input type="number" name="max_text_tokens" min="32" max="4096" value="{{ settings.max_text_tokens }}" />
+        </label>
+        <label>默认段间静音 (秒)
+          <input type="number" step="0.05" name="default_interval" value="{{ settings.default_interval }}" />
+        </label>
+        <label>默认情感权重
+          <input type="number" step="0.05" name="emo_alpha" value="{{ settings.emo_alpha }}" />
+        </label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="fp16" value="1" {% if settings.fp16=='1' %}checked{% endif %}/> FP16</label>
+          <label><input type="checkbox" name="force" value="1" {% if settings.force=='1' %}checked{% endif %}/> 覆盖输出</label>
+          <label><input type="checkbox" name="use_cuda_kernel" value="1" {% if settings.use_cuda_kernel=='1' %}checked{% endif %}/> BigVGAN CUDA</label>
+          <label><input type="checkbox" name="deepspeed" value="1" {% if settings.deepspeed=='1' %}checked{% endif %}/> DeepSpeed</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>角色情绪默认值</h2>
+        {% if speakers_settings %}
+          <div class="speaker-grid">
+            {% for speaker in speakers_settings %}
+              <div class="speaker-card">
+                <h3>{{ speaker.id }}</h3>
+                <label>情感模式
+                  <select name="emo_mode_{{ speaker.id }}">
+                    <option value="" {% if speaker.emo_mode == '' %}selected{% endif %}>默认</option>
+                    <option value="text" {% if speaker.emo_mode == 'text' %}selected{% endif %}>文本</option>
+                    <option value="audio" {% if speaker.emo_mode == 'audio' %}selected{% endif %}>参考音频</option>
+                    <option value="vector" {% if speaker.emo_mode == 'vector' %}selected{% endif %}>向量</option>
+                  </select>
+                </label>
+                <label>情感描述
+                  <select name="emo_text_{{ speaker.id }}">
+                    <option value="" {% if speaker.emo_text == '' %}selected{% endif %}>默认</option>
+                    {% for preset in preset_emo_texts %}
+                      <option value="{{ preset }}" {% if speaker.emo_text == preset %}selected{% endif %}>{{ preset }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>情感权重
+                  <input type="number" step="0.05" name="emo_alpha_{{ speaker.id }}" value="{{ speaker.emo_alpha }}" />
+                </label>
+                <label>段间停顿 (秒)
+                  <input type="number" step="0.05" name="interval_silence_{{ speaker.id }}" value="{{ speaker.interval_silence }}" />
+                </label>
+                <label>参考音频路径
+                  <input type="text" name="emo_audio_{{ speaker.id }}" value="{{ speaker.emo_audio }}" />
+                </label>
+                <label>向量 (JSON)
+                  <input type="hidden" class="vector-hidden" name="emo_vector_{{ speaker.id }}" value="{{ speaker.emo_vector }}" />
+                  <details class="vector-details">
+                    <summary>编辑情感向量</summary>
+                    <div class="vector-container" data-target="emo_vector_{{ speaker.id }}">
+                      {% for key in vector_keys %}
+                        <div class="vector-row">
+                          <span>{{ key }}</span>
+                          <input type="range" min="0" max="1" step="0.05" value="{{ '%.2f'|format(speaker.emo_vector_list[loop.index0]) }}" data-idx="{{ loop.index0 }}" />
+                          <span class="vector-value">{{ '%.2f'|format(speaker.emo_vector_list[loop.index0]) }}</span>
+                        </div>
+                      {% endfor %}
+                      <small>顺序：高兴、愤怒、悲伤、恐惧、反感、低落、惊讶、自然。</small>
+                    </div>
+                  </details>
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">配置中未定义主持人或无法加载配置文件。</div>
+        {% endif %}
+      </div>
+
+  <div class="actions">
+    <button type="submit">保存并返回</button>
+    <a class="secondary" style="padding:0.55rem 1.4rem; text-decoration:none; display:inline-block; text-align:center;" href="{{ url_for('index', **settings_query) }}">取消</a>
+  </div>
+</form>
+
+    <script>
+      (function() {
+        const containers = document.querySelectorAll('.vector-container');
+        containers.forEach(container => {
+          const hidden = container.closest('label').querySelector('.vector-hidden');
+          const sliders = container.querySelectorAll('input[type="range"]');
+          const values = container.querySelectorAll('.vector-value');
+          const updateHidden = () => {
+            const arr = Array.from(sliders).map((slider, idx) => {
+              const val = parseFloat(slider.value || '0').toFixed(2);
+              if (values[idx]) values[idx].textContent = val;
+              return val;
+            });
+            hidden.value = '[' + arr.join(', ') + ']';
+          };
+          sliders.forEach(slider => slider.addEventListener('input', updateHidden));
+          updateHidden();
+        });
+      })();
+    </script>
+  </body>
+</html>
