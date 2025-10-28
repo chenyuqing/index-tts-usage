@@ -210,13 +210,17 @@ def index():
 
     scripts_info = []
     parser = ScriptParser()
+    valid_speakers = {s["id"].lower(): s["id"] for s in speakers_settings}
     for script in scripts:
-        speakers = []
+        speakers: List[str] = []
         try:
             parse_res = parser.parse_file(script)
-            speakers = sorted({seg.speaker for seg in parse_res.segments})
+            raw = {seg.speaker for seg in parse_res.segments}
+            speakers = sorted({valid_speakers.get(s.lower(), s) for s in raw if s.lower() in valid_speakers})
         except Exception as exc:  # noqa: BLE001
             flash(f"解析脚本失败 {script}: {exc}", "error")
+        if not speakers:
+            speakers = sorted(valid_speakers.values())
         scripts_info.append(
             {
                 "path": script,
