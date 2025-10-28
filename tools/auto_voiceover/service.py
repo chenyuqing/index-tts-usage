@@ -112,14 +112,19 @@ def run_voiceover(
     )
     plan_result = planner.plan(parse_result)
 
+    valid_speakers = {sid.lower() for sid in config.speakers.keys()}
+
     filter_set: Optional[set[str]] = None
     if speaker_filter:
         filter_set = {sid.lower() for sid in speaker_filter}
+        filter_set &= valid_speakers
+
+    allowed_set = filter_set if filter_set is not None else valid_speakers
 
     tasks = [
         task
         for task in plan_result.tasks
-        if filter_set is None or task.segment.speaker.lower() in filter_set
+        if task.segment.speaker.lower() in allowed_set
     ]
 
     if not tasks:
