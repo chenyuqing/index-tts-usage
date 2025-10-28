@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from tools.auto_voiceover.config import AutoVoiceoverConfig, load_config
 from tools.auto_voiceover.parser import ScriptParser
-from tools.auto_voiceover.planner import TaskPlanner, VoiceoverTask
+from tools.auto_voiceover.planner import PlanResult, TaskPlanner, VoiceoverTask
 from tools.auto_voiceover.postprocess import ManifestConfig, PostProcessor
 from tools.auto_voiceover.tts_runner import (
     ExecutionOptions,
@@ -38,6 +38,7 @@ def run_voiceover(
     emo_alpha: float = 1.0,
     verbose: bool = False,
     speaker_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
+    speaker_filter: Optional[List[str]] = None,
     cancel_checker: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
     """执行自动配音流程，返回执行结果详情。"""
@@ -46,7 +47,6 @@ def run_voiceover(
     config_path = Path(config_path).expanduser().resolve()
     out_root = Path(out_root).expanduser().resolve()
 
-    # 自动创建输出目录
     try:
         out_root.mkdir(parents=True, exist_ok=True)
     except Exception as exc:  # noqa: BLE001
@@ -76,11 +76,9 @@ def run_voiceover(
                 continue
             profile = config.speakers[speaker_id]
             if "emo_mode" in overrides:
-                value = overrides.get("emo_mode") or None
-                profile.emo_mode = value
+                profile.emo_mode = overrides.get("emo_mode") or None
             if "emo_text" in overrides:
-                value = overrides.get("emo_text")
-                profile.emo_text = value or None
+                profile.emo_text = overrides.get("emo_text") or None
             if "emo_alpha" in overrides:
                 try:
                     profile.emo_alpha = float(overrides.get("emo_alpha")) if overrides.get("emo_alpha") not in (None, "") else None
@@ -92,8 +90,8 @@ def run_voiceover(
                 except (TypeError, ValueError):
                     pass
             if "emo_audio" in overrides:
-                value = overrides.get("emo_audio")
-                profile.emo_audio = str(value) if value else None
+                audio_value = overrides.get("emo_audio")
+                profile.emo_audio = str(audio_value) if audio_value else None
             if "emo_vector" in overrides and overrides.get("emo_vector"):
                 try:
                     vector = overrides.get("emo_vector")
@@ -113,6 +111,36 @@ def run_voiceover(
         config_root=config_path.parent,
     )
     plan_result = planner.plan(parse_result)
+
+    filter_set: Optional[set[str]] = None
+    if speaker_filter:
+        filter_set = {sid.lower() for sid in speaker_filter}
+
+    tasks = [
+        task
+        for task in plan_result.tasks
+        if filter_set is None or task.segment.speaker.lower() in filter_set
+    ]
+
+    if not tasks:
+        return {
+            "dry_run": dry_run,
+            "segment_count": 0,
+            "speakers": sorted(config.speakers.keys()),
+            "output_root": str(plan_result.output_root),
+            "episode_title": plan_result.episode_title,
+            "segments": [],
+            "voice_root": str(voice_root_path) if voice_root_path else None,
+            "progress_log": [],
+            "status": "ok",
+            "cancelled": False,
+            "message": "未找到匹配的主持人片段",
+        }
+
+    filtered_plan = plan_result
+    if tasks is not plan_result.tasks:
+        filtered_plan = PlanResult(tasks=tasks, output_root=plan_result.output_root, episode_title=plan_result.episode_title)
+
     segments_payload = [
         {
             "sequence_id": task.sequence_id,
@@ -125,7 +153,7 @@ def run_voiceover(
             if task.output_path.is_relative_to(plan_result.output_root)
             else str(task.output_path),
         }
-        for task in plan_result.tasks
+        for task in tasks
     ]
 
     if dry_run:
@@ -133,10 +161,13 @@ def run_voiceover(
             "dry_run": True,
             "segment_count": len(segments_payload),
             "speakers": sorted(config.speakers.keys()),
-            "output_root": str(plan_result.output_root),
-            "episode_title": plan_result.episode_title,
+            "output_root": str(filtered_plan.output_root),
+            "episode_title": filtered_plan.episode_title,
             "segments": segments_payload,
             "voice_root": str(voice_root_path) if voice_root_path else None,
+            "progress_log": [],
+            "status": "ok",
+            "cancelled": False,
         }
 
     if model_dir is None:
@@ -174,7 +205,7 @@ def run_voiceover(
     cancelled = False
     try:
         summary = executor.run(
-            plan_result.tasks,
+            tasks,
             exec_options,
             progress_callback=_progress_cb,
             cancel_checker=cancel_checker,
@@ -186,15 +217,15 @@ def run_voiceover(
     manifest_path: Optional[Path] = None
     manifest_payload: Optional[Dict[str, Any]] = None
     if not cancelled:
-        manifest_config = ManifestConfig(output_root=plan_result.output_root)
+        manifest_config = ManifestConfig(output_root=filtered_plan.output_root)
         post_processor = PostProcessor(manifest_config)
-        manifest_path, manifest_payload = post_processor.emit_manifest(plan_result, summary)
+        manifest_path, manifest_payload = post_processor.emit_manifest(filtered_plan, summary)
 
     return {
         "dry_run": False,
-        "output_root": str(plan_result.output_root),
-        "episode_title": plan_result.episode_title,
-        "segment_count": len(plan_result.tasks),
+        "output_root": str(filtered_plan.output_root),
+        "episode_title": filtered_plan.episode_title,
+        "segment_count": len(tasks),
         "summary": {
             "total": len(summary.results),
             "completed": summary.completed,
@@ -208,6 +239,7 @@ def run_voiceover(
         "speaker_overrides": speaker_overrides or {},
         "progress_log": progress_log,
         "cancelled": cancelled,
+        "status": "ok",
     }
 
 

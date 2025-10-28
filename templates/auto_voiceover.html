@@ -183,6 +183,21 @@
         margin-bottom: 0;
       }
 
+      .speaker-filter {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin: 0.4rem 0;
+        font-size: 0.9rem;
+      }
+
+      .speaker-filter label {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.35rem;
+        margin-bottom: 0;
+      }
+
       .speaker-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -200,6 +215,30 @@
         margin: 0 0 0.6rem;
         font-size: 1rem;
         font-weight: 600;
+      }
+
+      .vector-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .vector-row {
+        display: grid;
+        grid-template-columns: 80px 1fr 50px;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+      }
+
+      .vector-row input[type="range"] {
+        width: 100%;
+      }
+
+      .vector-row .vector-value {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
       }
 
       details {
@@ -334,6 +373,12 @@
                     <input type="hidden" name="deepspeed" value="{{ '1' if settings.deepspeed else '' }}" />
                     <input type="hidden" name="script_speakers" value="{{ item.speakers|join(',') }}" />
                     {% if item.speakers %}
+                      <div class="speaker-filter">
+                        <strong>生成主持人：</strong>
+                        {% for speaker_id in item.speakers %}
+                          <label><input type="checkbox" name="speaker_filter" value="{{ speaker_id }}" checked /> {{ speaker_id }}</label>
+                        {% endfor %}
+                      </div>
                       <details>
                         <summary>角色情绪配置 ({{ item.speakers|length }})</summary>
                         <div class="speaker-grid" style="margin-top:0.75rem;">
@@ -485,8 +530,17 @@
           const formData = new FormData(form);
           const payload = {};
           formData.forEach((value, key) => {
-            payload[key] = value;
+            if (payload[key] === undefined) {
+              payload[key] = value;
+            } else if (Array.isArray(payload[key])) {
+              payload[key].push(value);
+            } else {
+              payload[key] = [payload[key], value];
+            }
           });
+          if (!payload['speaker_filter']) {
+            payload['speaker_filter'] = Array.from(form.querySelectorAll('input[name="speaker_filter"]:checked')).map(el => el.value);
+          }
           payload['action'] = action;
 
           try {

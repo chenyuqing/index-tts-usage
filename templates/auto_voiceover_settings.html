@@ -81,6 +81,25 @@
         font-size: 1rem;
       }
 
+      .vector-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .vector-row {
+        display: grid;
+        grid-template-columns: 80px 1fr 50px;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+      }
+
+      .vector-row input[type="range"] {
+        width: 100%;
+      }
+
       .actions {
         margin-top: 1.2rem;
         display: flex;

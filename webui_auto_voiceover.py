@@ -300,6 +300,8 @@ def settings_page():
             redirect_params[f"emo_text_{speaker['id']}"] = request.form.get(f"emo_text_{speaker['id']}", speaker["emo_text"])
             redirect_params[f"emo_alpha_{speaker['id']}"] = request.form.get(f"emo_alpha_{speaker['id']}", speaker["emo_alpha"])
             redirect_params[f"interval_silence_{speaker['id']}"] = request.form.get(f"interval_silence_{speaker['id']}", speaker["interval_silence"])
+            redirect_params[f"emo_audio_{speaker['id']}"] = request.form.get(f"emo_audio_{speaker['id']}", speaker["emo_audio"])
+            redirect_params[f"emo_vector_{speaker['id']}"] = request.form.get(f"emo_vector_{speaker['id']}", speaker["emo_vector"])
 
         return redirect(url_for("index", **redirect_params))
 
@@ -342,8 +344,18 @@ def run_endpoint():
     speakers_raw = data.get("script_speakers", "")
     speakers_list = [s for s in speakers_raw.split(",") if s]
 
+    raw_filter = data.get("speaker_filter")
+    if isinstance(raw_filter, list):
+        filter_list = [s for s in raw_filter if s]
+    elif isinstance(raw_filter, str):
+        filter_list = [s for s in raw_filter.split(",") if s]
+    else:
+        filter_list = []
+    if not filter_list:
+        filter_list = speakers_list
+
     overrides: Dict[str, Dict[str, Any]] = {}
-    for sid in speakers_list:
+    for sid in filter_list:
         overrides[sid] = {
             "emo_mode": data.get(f"emo_mode_{sid}"),
             "emo_text": data.get(f"emo_text_{sid}"),
@@ -379,6 +391,7 @@ def run_endpoint():
             emo_alpha=float(data.get("emo_alpha") or 1.0),
             verbose=False,
             speaker_overrides=overrides,
+            speaker_filter=filter_list,
             cancel_checker=cancel_checker,
         )
         result_status = "cancelled" if result.get("cancelled") else "ok"
