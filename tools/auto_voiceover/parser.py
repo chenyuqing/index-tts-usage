@@ -53,7 +53,7 @@ class ScriptParser:
     SPEECH_PATTERN = re.compile(r"^\*\*(?P<speaker>[^*]+?)[：:]\*\*\s*(?P<content>.*)$")
     DIRECTIVE_PATTERN = re.compile(r"^[（(](?P<content>.+?)[)）]\s*$")
     EMOTION_PATTERN = re.compile(
-        r"^\s*[【\[]\s*(?:情绪|emotion)\s*[=:：]\s*(?P<value>[^】\]]+)\s*[】\]]\s*",
+        r"^\s*[【\[]\s*(?:情绪|emotion|tone|mood|style)\s*[=:：]\s*(?P<value>[^】\]]+)\s*[】\]]\s*",
         re.IGNORECASE,
     )
 
