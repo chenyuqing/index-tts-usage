@@ -113,6 +113,17 @@ def run_voiceover(
     plan_result = planner.plan(parse_result)
 
     valid_speakers = {sid.lower() for sid in config.speakers.keys()}
+    missing_segments = getattr(plan_result, "skipped_segments", [])
+    missing_speakers = sorted({segment.speaker for segment in missing_segments})
+    missing_segments_payload = [
+        {
+            "sequence_id": segment.sequence_id,
+            "chapter_id": segment.chapter_id,
+            "speaker": segment.speaker,
+            "text": segment.text,
+        }
+        for segment in missing_segments
+    ]
 
     filter_set: Optional[set[str]] = None
     if speaker_filter:
@@ -140,11 +151,18 @@ def run_voiceover(
             "status": "ok",
             "cancelled": False,
             "message": "未找到匹配的主持人片段",
+            "missing_speakers": missing_speakers,
+            "missing_segments": missing_segments_payload,
         }
 
     filtered_plan = plan_result
     if tasks is not plan_result.tasks:
-        filtered_plan = PlanResult(tasks=tasks, output_root=plan_result.output_root, episode_title=plan_result.episode_title)
+        filtered_plan = PlanResult(
+            tasks=tasks,
+            output_root=plan_result.output_root,
+            episode_title=plan_result.episode_title,
+            skipped_segments=plan_result.skipped_segments,
+        )
 
     segments_payload = [
         {
@@ -173,6 +191,8 @@ def run_voiceover(
             "progress_log": [],
             "status": "ok",
             "cancelled": False,
+            "missing_speakers": missing_speakers,
+            "missing_segments": missing_segments_payload,
         }
 
     if model_dir is None:
@@ -245,6 +265,8 @@ def run_voiceover(
         "progress_log": progress_log,
         "cancelled": cancelled,
         "status": "ok",
+        "missing_speakers": missing_speakers,
+        "missing_segments": missing_segments_payload,
     }
 
 

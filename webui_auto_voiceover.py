@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import yaml
+
 from flask import Flask, flash, redirect, render_template, request, url_for, jsonify
 
 from tools.auto_voiceover.config import load_config
@@ -39,6 +41,54 @@ EMO_VECTOR_KEYS = [
 ]
 
 current_job: Dict[str, bool] = {"running": False, "cancel": False}
+
+
+def ensure_config_file(config_path: Path, base_dir: Path, voice_root_value: Optional[str]) -> Path:
+    config_path = config_path.expanduser().resolve()
+    if config_path.exists():
+        return config_path
+
+    voice_root = Path(voice_root_value).expanduser().resolve() if voice_root_value else (base_dir / "voice-reference")
+    if not voice_root.exists():
+        return config_path
+
+    speakers: Dict[str, Any] = {}
+    for subdir in sorted(voice_root.iterdir()):
+        if not subdir.is_dir():
+            continue
+        voice_files = []
+        for ext in ("*.wav", "*.mp3", "*.m4a", "*.flac", "*.ogg"):
+            voice_files.extend(subdir.glob(ext))
+        if not voice_files:
+            continue
+        voice_prompt = str(voice_files[0].resolve())
+        speakers[subdir.name] = {
+            "voice_prompt": voice_prompt,
+            "emo_mode": "text",
+            "emo_text": "",
+            "emo_alpha": 0.8,
+            "interval_silence": 0.2,
+        }
+
+    if not speakers:
+        return config_path
+
+    config_data = {
+        "default_tts": {"top_p": 0.8, "temperature": 0.8},
+        "voice_root": str(voice_root.resolve()),
+        "auto_speaker_defaults": {
+            "emo_mode": "text",
+            "emo_text": "",
+            "emo_alpha": 0.8,
+            "interval_silence": 0.2,
+        },
+        "speakers": speakers,
+    }
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with config_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(config_data, f, allow_unicode=True)
+    return config_path
 
 
 def discover_scripts(base_dir: Path) -> List[Path]:
@@ -136,7 +186,9 @@ def index():
     base_dir = Path(base_settings["base_dir"]).expanduser().resolve()
     model_dir = Path(base_settings["model_dir"]).expanduser().resolve()
     voice_root_param = base_settings["voice_root"] or None
-    config_path = Path(base_settings["config_path"] or (base_dir / "speakers.yaml")).expanduser().resolve()
+    config_candidate = Path(base_settings["config_path"]) if base_settings.get("config_path") else base_dir / "speakers.yaml"
+    config_path = ensure_config_file(config_candidate, base_dir, voice_root_param)
+    base_settings["config_path"] = str(config_path)
 
     scripts: List[Path] = []
     if base_dir.exists():
@@ -276,7 +328,9 @@ def settings_page():
     base_dir = Path(base_settings["base_dir"]).expanduser().resolve()
     model_dir = Path(base_settings["model_dir"]).expanduser().resolve()
     voice_root_param = base_settings["voice_root"] or ""
-    config_path = Path(base_settings["config_path"] or (base_dir / "speakers.yaml")).expanduser().resolve()
+    config_candidate = Path(base_settings["config_path"]) if base_settings.get("config_path") else base_dir / "speakers.yaml"
+    config_path = ensure_config_file(config_candidate, base_dir, voice_root_param or None)
+    base_settings["config_path"] = str(config_path)
 
     speakers_settings = _load_speaker_settings(config_path, base_settings)
 
@@ -295,7 +349,10 @@ def settings_page():
         base_settings["deepspeed"] = "1" if request.form.get("deepspeed") else "0"
 
         base_dir = Path(base_settings["base_dir"]).expanduser().resolve()
-        config_path = Path(base_settings["config_path"] or (base_dir / "speakers.yaml")).expanduser().resolve()
+        voice_root_current = base_settings.get("voice_root") or ""
+        config_candidate = Path(base_settings["config_path"]) if base_settings.get("config_path") else base_dir / "speakers.yaml"
+        config_path = ensure_config_file(config_candidate, base_dir, voice_root_current or None)
+        base_settings["config_path"] = str(config_path)
         speakers_settings = _load_speaker_settings(config_path, base_settings)
 
         redirect_params = {k: v for k, v in base_settings.items() if v not in (None, "")}
@@ -344,6 +401,13 @@ def run_endpoint():
     out_root = data.get("out_root")
     if not script_path or not config_path or not out_root:
         return jsonify({"status": "error", "message": "缺少必要参数"}), 400
+
+    base_dir_value = data.get("base_dir")
+    if base_dir_value:
+        base_dir_path = Path(base_dir_value).expanduser().resolve()
+    else:
+        base_dir_path = Path(config_path).expanduser().resolve().parent
+    config_path = ensure_config_file(Path(config_path), base_dir_path, data.get("voice_root"))
 
     speakers_raw = data.get("script_speakers", "")
     speakers_list = [s for s in speakers_raw.split(",") if s]
