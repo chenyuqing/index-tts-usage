@@ -121,6 +121,7 @@ def run_voiceover(
             "chapter_id": segment.chapter_id,
             "speaker": segment.speaker,
             "text": segment.text,
+            "emotion_hint": getattr(segment, "emotion_hint", None),
         }
         for segment in missing_segments
     ]
@@ -171,6 +172,7 @@ def run_voiceover(
             "chapter_title": task.segment.chapter_title,
             "speaker": task.segment.speaker,
             "text": task.segment.text,
+            "emotion_hint": getattr(task.segment, "emotion_hint", None),
             "directives": [directive.__dict__ for directive in task.segment.directives],
             "output_path": str(task.output_path.relative_to(plan_result.output_root))
             if task.output_path.is_relative_to(plan_result.output_root)

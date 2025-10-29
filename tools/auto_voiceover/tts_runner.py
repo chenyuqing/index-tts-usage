@@ -168,6 +168,8 @@ class IndexTTS2Executor:
         speaker = task.speaker_profile
         emo_mode = (speaker.emo_mode or "").lower()
         base_alpha = speaker.emo_alpha if getattr(speaker, "emo_alpha", None) is not None else options.emo_alpha
+        segment_hint = getattr(task.segment, "emotion_hint", None)
+        segment_hint = segment_hint.strip() if isinstance(segment_hint, str) else None
 
         if emo_mode == "audio":
             emo_audio = speaker.emo_audio or speaker.voice_prompt
@@ -182,8 +184,11 @@ class IndexTTS2Executor:
             return {"emo_vector": list(speaker.emo_vector), "emo_alpha": base_alpha}
 
         if emo_mode == "text":
-            emo_text = speaker.emo_text or task.segment.text
+            emo_text = segment_hint or speaker.emo_text or task.segment.text
             return {"use_emo_text": True, "emo_text": emo_text, "emo_alpha": base_alpha}
+
+        if segment_hint:
+            return {"use_emo_text": True, "emo_text": segment_hint, "emo_alpha": base_alpha}
 
         # 默认情况下不传 emotion 参数；IndexTTS2 会复用音色参考音频。
         return {}
