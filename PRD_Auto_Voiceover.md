@@ -275,4 +275,5 @@ uv run python tools/auto_voiceover.py \
   --voice-root tools/test_input/voice-reference \
   --language en --dry-run
 ```
-- **前端入口**：`uv run python webui_auto_voiceover.py` 启动 Flask 页面后，只需填入基础目录即可列出脚本并执行 Dry-run / 正式合成。
+- **前端入口**：`uv run python webui_auto_voiceover.py` 启动 Flask 页面后，只需填入基础目录即可列出脚本并执行 Dry-run / 正式合成。  
+  - `Dry-run` 按钮会以当前脚本、情绪提示、主持人筛选等参数创建执行计划，但不会真正调用 TTS。页面会刷新并展示解析出的段落列表、情绪标记、预期输出路径以及缺失的主持人信息，便于正式生成前做脚本与配置的校验。
